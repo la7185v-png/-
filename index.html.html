@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>业务追踪看板</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F8F7F4;
+    --surface: #FFFFFF;
+    --ink: #1C1B18;
+    --ink-soft: #8A877F;
+    --accent: #C0521A;
+    --accent-light: #FAEEE6;
+    --green: #2A7A55;
+    --green-light: #E4F2EB;
+    --blue: #1A4A8A;
+    --blue-light: #E3EDF8;
+    --border: #E5E2DA;
+    --row-hover: #FAF9F6;
+    --sans: 'Noto Sans SC', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--ink); padding: 28px 24px; min-height: 100vh; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
+  .header-title { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); margin-top: 3px; }
+  .month-tag { background: var(--ink); color: #fff; font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: 3px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 24px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; position: relative; overflow: hidden; }
+  .stat::after { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
+  .stat.s1::after { background: var(--accent); }
+  .stat.s2::after { background: var(--green); }
+  .stat.s3::after { background: var(--blue); }
+  .stat.s4::after { background: var(--ink-soft); }
+  .stat-n { font-size: 26px; font-weight: 700; line-height: 1; }
+  .stat-l { font-size: 11px; color: var(--ink-soft); font-family: var(--mono); margin-top: 3px; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); background: #FAFAF8; }
+  .section-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot-o { background: var(--accent); }
+  .dot-g { background: var(--green); }
+  .add-btn { font-size: 11px; font-family: var(--mono); color: var(--ink-soft); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; cursor: pointer; transition: all .15s; }
+  .add-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl thead th {
+    font-size: 10px; font-family: var(--mono); color: var(--ink-soft);
+    font-weight: 500; text-align: left; padding: 9px 12px;
+    border-bottom: 1px solid var(--border); background: #FAFAF8;
+    white-space: nowrap; letter-spacing: 0.4px; text-transform: uppercase;
+  }
+  .tbl tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  .tbl tbody tr:last-child { border-bottom: none; }
+  .tbl tbody tr:hover { background: var(--row-hover); }
+  .tbl td { padding: 0; vertical-align: middle; }
+
+  .cell {
+    display: block; width: 100%; padding: 10px 12px;
+    font-size: 13px; font-family: var(--sans); color: var(--ink);
+    background: transparent; border: none; outline: none;
+    line-height: 1.4;
+  }
+  .cell::placeholder { color: #C8C4BC; font-style: italic; }
+  .cell:focus { background: #FFFEF9; box-shadow: inset 0 0 0 1.5px #D4CFC5; }
+  select.cell { cursor: pointer; appearance: none; -webkit-appearance: none; }
+  input[type="date"].cell,
+  input[type="month"].cell,
+  input[type="number"].cell { font-family: var(--mono); font-size: 12px; }
+  input[type="number"].cell { text-align: right; }
+
+  .status-wrap { position: relative; }
+  .status-wrap::after { content:'▾'; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--ink-soft); pointer-events:none; }
+  select.st-hot    { color: var(--accent); font-weight: 600; }
+  select.st-follow { color: var(--blue);   font-weight: 600; }
+  select.st-wait   { color: var(--ink-soft); }
+  select.st-done   { color: var(--green);  font-weight: 600; }
+
+  .prog-wrap { padding: 8px 12px; }
+  .prog-bar-bg { height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+  .prog-bar-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+  .prog-label { font-size: 10px; font-family: var(--mono); color: var(--ink-soft); text-align: right; }
+
+  .del-btn { display: block; width: 100%; padding: 10px; background: none; border: none; cursor: pointer; color: #CECCCA; font-size: 13px; transition: color .15s; }
+  .del-btn:hover { color: #E05A3A; }
+  .idx-label { display:block; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-align:center; padding: 10px 4px; }
+  .empty-msg { text-align:center; padding:24px; color:var(--ink-soft); font-size:12px; font-family:var(--mono); font-style:italic; }
+
+  @media(max-width:700px){
+    .stats { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">业务追踪看板</div>
+    <div class="header-sub">客户节点 · 月度目标 · 自动保存</div>
+  </div>
+  <div class="month-tag" id="monthTag">—</div>
+</div>
+
+<div class="stats">
+  <div class="stat s1"><div class="stat-n" id="s-clients">0</div><div class="stat-l">跟进客户</div></div>
+  <div class="stat s2"><div class="stat-n" id="s-done">0</div><div class="stat-l">已成交</div></div>
+  <div class="stat s3"><div class="stat-n" id="s-amount">0</div><div class="stat-l">预估总金额（元）</div></div>
+  <div class="stat s4"><div class="stat-n" id="s-goals">0</div><div class="stat-l">本月目标数</div></div>
+</div>
+
+<!-- CLIENT TABLE -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><span class="dot dot-o"></span>客户节点</div>
+    <button class="add-btn" onclick="addClient()">+ 新增一行</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th style="min-width:140px">客户名称 / 公司</th>
+          <th style="min-width:140px">需求</th>
+          <th style="min-width:120px">备注 / 来源</th>
+          <th style="width:130px">节点日期</th>
+          <th style="width:110px">预估金额（元）</th>
+          <th style="width:105px">状态</th>
+          <th style="width:100px">进度</th>
+          <th style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="clientBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- GOAL TABLE -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title"><span class="dot dot-g"></span>月度目标</div>
+    <button class="add-btn" onclick="addGoal()">+ 新增一行</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th style="min-width:150px">目标名称</th>
+          <th style="width:120px">月份</th>
+          <th style="width:100px">目标值</th>
+          <th style="width:100px">当前进度</th>
+          <th style="width:80px">单位</th>
+          <th style="min-width:130px">备注</th>
+          <th style="width:100px">完成度</th>
+          <th style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="goalBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const now = new Date();
+const yr  = now.getFullYear();
+const mo  = String(now.getMonth()+1).padStart(2,'0');
+document.getElementById('monthTag').textContent = `${yr} / ${mo}`;
+
+let clients = JSON.parse(localStorage.getItem('biz3-clients') || 'null');
+let goals   = JSON.parse(localStorage.getItem('biz3-goals')   || 'null');
+
+if (!clients) clients = [
+  { name:'王总 · 锐行传媒', req:'VI设计+社媒运营', note:'朋友介绍', date:`${yr}-${mo}-08`, price:12000, status:'hot' },
+  { name:'李姐 · 初然餐饮',  req:'菜单设计',       note:'朋友介绍', date:`${yr}-${mo}-12`, price:3800,  status:'follow' },
+  { name:'', req:'', note:'', date:'', price:'', status:'wait' },
+];
+if (!goals) goals = [
+  { name:'签约新客户',  month:`${yr}-${mo}`, target:4,     current:1,    unit:'个',  note:'' },
+  { name:'月度营业额',  month:`${yr}-${mo}`, target:30000, current:8000, unit:'元',  note:'冲刺目标' },
+  { name:'',           month:`${yr}-${mo}`, target:'',    current:'',   unit:'',    note:'' },
+];
+
+function save() {
+  localStorage.setItem('biz3-clients', JSON.stringify(clients));
+  localStorage.setItem('biz3-goals',   JSON.stringify(goals));
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('s-clients').textContent = clients.filter(c=>c.name).length;
+  document.getElementById('s-done').textContent    = clients.filter(c=>c.status==='done').length;
+  const total = clients.reduce((s,c)=>s+(Number(c.price)||0),0);
+  document.getElementById('s-amount').textContent  = total.toLocaleString('zh-CN');
+  document.getElementById('s-goals').textContent   = goals.filter(g=>g.name).length;
+}
+
+function progBar(current, target) {
+  const pct = (target>0) ? Math.min(100,Math.round(Number(current)/Number(target)*100)) : 0;
+  const col  = pct>=100 ? '#2A7A55' : pct>=50 ? '#1A4A8A' : '#C0521A';
+  return `<div class="prog-wrap">
+    <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+    <div class="prog-label">${target?pct+'%':'—'}</div>
+  </div>`;
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
+// ── CLIENTS ──
+function renderClients() {
+  const tb = document.getElementById('clientBody');
+  if (!clients.length) { tb.innerHTML=`<tr><td colspan="9"><div class="empty-msg">点击「新增一行」开始</div></td></tr>`; return; }
+  tb.innerHTML = clients.map((c,i)=>`
+    <tr>
+      <td><span class="idx-label">${String(i+1).padStart(2,'0')}</span></td>
+      <td><input class="cell" placeholder="客户名称 / 公司" value="${esc(c.name)}" oninput="clients[${i}].name=this.value;save()"></td>
+      <td><input class="cell" placeholder="需求描述" value="${esc(c.req)}" oninput="clients[${i}].req=this.value;save()"></td>
+      <td><input class="cell" placeholder="来源 / 备注" value="${esc(c.note)}" oninput="clients[${i}].note=this.value;save()"></td>
+      <td><input class="cell" type="date" value="${esc(c.date)}" oninput="clients[${i}].date=this.value;save()"></td>
+      <td><input class="cell" type="number" placeholder="0" value="${c.price}" oninput="clients[${i}].price=this.value;save()"></td>
+      <td><div class="status-wrap"><select class="cell st-${c.status}" onchange="clients[${i}].status=this.value;this.className='cell st-'+this.value;save()">
+        <option value="hot"    ${c.status==='hot'   ?'selected':''}>🔥 意向强</option>
+        <option value="follow" ${c.status==='follow'?'selected':''}>📞 跟进中</option>
+        <option value="wait"   ${c.status==='wait'  ?'selected':''}>⏳ 待回复</option>
+        <option value="done"   ${c.status==='done'  ?'selected':''}>✅ 已成交</option>
+      </select></div></td>
+      <td>${progBar(c.price, clients.reduce((m,x)=>Math.max(m,Number(x.price)||0),1))}</td>
+      <td><button class="del-btn" onclick="delClient(${i})">✕</button></td>
+    </tr>`).join('');
+  updateStats();
+}
+
+function addClient() {
+  clients.push({ name:'', req:'', note:'', date:'', price:'', status:'wait' });
+  save(); renderClients();
+  setTimeout(()=>{ const rows=document.querySelectorAll('#clientBody tr'); rows[rows.length-1]?.querySelector('input')?.focus(); },50);
+}
+function delClient(i) {
+  if(clients.length===1){ clients[0]={name:'',req:'',note:'',date:'',price:'',status:'wait'}; save(); renderClients(); return; }
+  clients.splice(i,1); save(); renderClients();
+}
+
+// ── GOALS ──
+function renderGoals() {
+  const tb = document.getElementById('goalBody');
+  if (!goals.length) { tb.innerHTML=`<tr><td colspan="9"><div class="empty-msg">点击「新增一行」开始</div></td></tr>`; return; }
+  tb.innerHTML = goals.map((g,i)=>`
+    <tr>
+      <td><span class="idx-label">${String(i+1).padStart(2,'0')}</span></td>
+      <td><input class="cell" placeholder="目标名称" value="${esc(g.name)}" oninput="goals[${i}].name=this.value;save()"></td>
+      <td><input class="cell" type="month" value="${esc(g.month)}" oninput="goals[${i}].month=this.value;save()"></td>
+      <td><input class="cell" type="number" placeholder="目标值" value="${g.target}" oninput="goals[${i}].target=this.value;save();renderGoals()"></td>
+      <td><input class="cell" type="number" placeholder="当前" value="${g.current}" oninput="goals[${i}].current=this.value;save();renderGoals()"></td>
+      <td><input class="cell" placeholder="个/元" value="${esc(g.unit)}" oninput="goals[${i}].unit=this.value;save()"></td>
+      <td><input class="cell" placeholder="备注" value="${esc(g.note)}" oninput="goals[${i}].note=this.value;save()"></td>
+      <td>${progBar(g.current, g.target)}</td>
+      <td><button class="del-btn" onclick="delGoal(${i})">✕</button></td>
+    </tr>`).join('');
+  updateStats();
+}
+
+function addGoal() {
+  goals.push({ name:'', month:`${yr}-${mo}`, target:'', current:'', unit:'', note:'' });
+  save(); renderGoals();
+  setTimeout(()=>{ const rows=document.querySelectorAll('#goalBody tr'); rows[rows.length-1]?.querySelector('input')?.focus(); },50);
+}
+function delGoal(i) {
+  if(goals.length===1){ goals[0]={name:'',month:`${yr}-${mo}`,target:'',current:'',unit:'',note:''}; save(); renderGoals(); return; }
+  goals.splice(i,1); save(); renderGoals();
+}
+
+renderClients();
+renderGoals();
+updateStats();
+</script>
+</body>
+</html>
